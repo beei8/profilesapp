@@ -9,7 +9,8 @@ import db from './db.js'
 dotenv.config()
 
 const app = express()
-const PORT = 3001
+// eslint-disable-next-line no-undef
+const PORT = process.env.PORT || 3001
 // eslint-disable-next-line no-undef
 const JWT_SECRET = process.env.JWT_SECRET
 
