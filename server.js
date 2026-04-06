@@ -14,7 +14,12 @@ const PORT = process.env.PORT || 3001
 // eslint-disable-next-line no-undef
 const JWT_SECRET = process.env.JWT_SECRET
 
-app.use(cors())
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production'
+    ? ['https://profilesappbc.netlify.app', 'https://profilesapp-production.up.railway.app']
+    : ['http://localhost:5173', 'http://localhost:3001'],
+  credentials: true
+}))
 app.use(express.json())
 
 // Rate limiting

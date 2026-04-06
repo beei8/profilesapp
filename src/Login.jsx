@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { apiPost } from './api'
 import './App.css'
 
 function Login({ setIsLoggedIn }) {
@@ -11,13 +12,7 @@ function Login({ setIsLoggedIn }) {
   const handleSubmit = async (e) => {
     e.preventDefault()
     try {
-      const response = await fetch('/api/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ username, password })
-      })
+      const response = await apiPost('/api/login', { username, password })
 
       if (response.ok) {
         const data = await response.json()

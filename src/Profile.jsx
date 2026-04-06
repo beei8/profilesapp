@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { apiGet } from './api'
 import './App.css'
 
 function Profile({ setIsLoggedIn }) {
@@ -21,11 +22,7 @@ function Profile({ setIsLoggedIn }) {
         return
       }
 
-      const response = await fetch('/api/profile', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
+      const response = await apiGet('/api/profile', token)
 
       if (response.ok) {
         const data = await response.json()
