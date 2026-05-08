@@ -18,7 +18,6 @@ const JWT_SECRET = process.env.JWT_SECRET
 const corsOrigins = process.env.NODE_ENV === 'production'
   ? [
       'https://profilesappbc.netlify.app',
-      'https://profilesapp-production.up.railway.app',
       /^https:\/\/.*\.onrender\.com$/  // Allow all Render domains
     ]
   : ['http://localhost:5173', 'http://localhost:3001']

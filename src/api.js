@@ -1,7 +1,7 @@
 // API utility for handling requests in both dev and production
 
 const API_BASE = import.meta.env.PROD 
-  ? 'https://profilesapp-production.up.railway.app'
+  ? 'https://profilesapp-vpur.onrender.com'
   : 'http://localhost:3001'
 
 export async function apiCall(endpoint, options = {}) {
