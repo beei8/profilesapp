@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken'
 import cors from 'cors'
 import dotenv from 'dotenv'
 import rateLimit from 'express-rate-limit'
-import db from './db.js'
+import { pool } from './db.js'
 
 dotenv.config()
 
@@ -14,10 +14,17 @@ const PORT = process.env.PORT || 3001
 // eslint-disable-next-line no-undef
 const JWT_SECRET = process.env.JWT_SECRET
 
+// Configure CORS for production and development
+const corsOrigins = process.env.NODE_ENV === 'production'
+  ? [
+      'https://profilesappbc.netlify.app',
+      'https://profilesapp-production.up.railway.app',
+      /^https:\/\/.*\.onrender\.com$/  // Allow all Render domains
+    ]
+  : ['http://localhost:5173', 'http://localhost:3001']
+
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production'
-    ? ['https://profilesappbc.netlify.app', 'https://profilesapp-production.up.railway.app']
-    : ['http://localhost:5173', 'http://localhost:3001'],
+  origin: corsOrigins,
   credentials: true
 }))
 app.use(express.json())
@@ -41,9 +48,20 @@ app.use('/api/', limiter)
 // Apply stricter rate limiting to login endpoint
 app.use('/api/login', loginLimiter)
 
-// Prepare database statements
-const getUserByUsername = db.prepare('SELECT * FROM users WHERE username = ?')
-const updateLastLogin = db.prepare('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?')
+// Health check endpoint (no rate limit, no auth)
+app.get('/health', (req, res) => {
+  res.json({ status: 'OK', timestamp: new Date().toISOString() })
+})
+
+// Database helper functions
+const getUserByUsername = async (username) => {
+  const result = await pool.query('SELECT * FROM users WHERE username = $1', [username])
+  return result.rows[0]
+}
+
+const updateLastLogin = async (userId) => {
+  await pool.query('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = $1', [userId])
+}
 
 // User registration endpoint
 app.post('/api/register', async (req, res) => {
@@ -54,19 +72,21 @@ app.post('/api/register', async (req, res) => {
     return res.status(400).json({ message: 'Username and password are required' })
   }
 
-  if (username.length < 3 || password.length < 6) {
-    return res.status(400).json({ message: 'Username must be at least 3 characters and password at least 6 characters' })
-  }
-
-  try {
-    // Check if user already exists
-    const existingUser = getUserByUsername.get(username)
+  if (username.length < 3await getUserByUsername(username)
     if (existingUser) {
       return res.status(409).json({ message: 'Username already exists' })
     }
 
     // Hash password
     const passwordHash = await bcrypt.hash(password, 12)
+
+    // Insert new user
+    const result = await pool.query(
+      'INSERT INTO users (username, password_hash) VALUES ($1, $2) RETURNING id',
+      [username, passwordHash]
+    )
+
+    res.status(201).json({ message: 'User registered successfully', userId: result.rows[0].
 
     // Insert new user
     const insertUser = db.prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)')
@@ -81,16 +101,8 @@ app.post('/api/register', async (req, res) => {
 
 // Setup endpoint for first admin user (only works when no users exist)
 app.post('/api/setup', async (req, res) => {
-  const { username, password, setupKey } = req.body
-
-  // Check if setup key matches environment variable
-  if (setupKey !== process.env.SETUP_KEY) {
-    return res.status(403).json({ message: 'Invalid setup key' })
-  }
-
-  // Check if any users already exist
-  const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get()
-  if (userCount.count > 0) {
+  const { username, await pool.query('SELECT COUNT(*) as count FROM users')
+  if (parseInt(userCount.rows[0].count) > 0) {
     return res.status(403).json({ message: 'Setup already completed' })
   }
 
@@ -108,6 +120,16 @@ app.post('/api/setup', async (req, res) => {
     const passwordHash = await bcrypt.hash(password, 12)
 
     // Insert admin user
+    const result = await pool.query(
+      'INSERT INTO users (username, password_hash) VALUES ($1, $2) RETURNING id',
+      [username, passwordHash]
+    )
+
+    console.log(`🚀 Admin user '${username}' created via setup endpoint`)
+
+    res.status(201).json({
+      message: 'Admin user created successfully',
+      userId: result.rows[0].
     const insertUser = db.prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)')
     const result = insertUser.run(username, passwordHash)
 
@@ -129,11 +151,7 @@ app.post('/api/login', async (req, res) => {
 
   // Basic input validation
   if (!username || !password) {
-    return res.status(400).json({ message: 'Username and password are required' })
-  }
-
-  try {
-    const user = getUserByUsername.get(username)
+    return res.stawait getUserByUsername(username)
     if (!user) {
       return res.status(401).json({ message: 'Invalid credentials' })
     }
@@ -141,6 +159,10 @@ app.post('/api/login', async (req, res) => {
     const isValidPassword = await bcrypt.compare(password, user.password_hash)
     if (!isValidPassword) {
       return res.status(401).json({ message: 'Invalid credentials' })
+    }
+
+    // Update last login
+    await updateLastLogis(401).json({ message: 'Invalid credentials' })
     }
 
     // Update last login
@@ -174,9 +196,9 @@ const authenticateToken = (req, res, next) => {
 
 // Protected route example
 app.get('/api/protected', authenticateToken, (req, res) => {
-  res.json({ message: `Hello ${req.user.username}, this is protected data!` })
-})
-
+  res.json({ message: `Hello ${req.user.useasync (req, res) => {
+  try {
+    const user = await getUserByUsername
 // Get user profile
 app.get('/api/profile', authenticateToken, (req, res) => {
   try {
@@ -198,6 +220,37 @@ app.get('/api/profile', authenticateToken, (req, res) => {
   }
 })
 
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`)
+// Start server
+const server = app.listen(PORT, () => {
+  console.log(`✅ Server running on port ${PORT}`)
+  console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`)
+})
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received, shutting down gracefully')
+  server.close(() => {
+    console.log('Server closed')
+    pool.end().then(() => {
+      console.log('Database pool closed')
+      process.exit(0)
+    }).catch((err) => {
+      console.error('Error closing database pool:', err)
+      process.exit(1)
+    })
+  })
+})
+
+process.on('SIGINT', () => {
+  console.log('SIGINT received, shutting down gracefully')
+  server.close(() => {
+    console.log('Server closed')
+    pool.end().then(() => {
+      console.log('Database pool closed')
+      process.exit(0)
+    }).catch((err) => {
+      console.error('Error closing database pool:', err)
+      process.exit(1)
+    })
+  })
 })

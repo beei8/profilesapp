@@ -1,41 +1,67 @@
-import Database from 'better-sqlite3'
+import pg from 'pg'
 import bcrypt from 'bcryptjs'
-import path from 'path'
-import { fileURLToPath } from 'url'
+import dotenv from 'dotenv'
 
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
+dotenv.config()
 
-const dbPath = path.join(__dirname, 'users.db')
-const db = new Database(dbPath)
+const { Pool } = pg
 
-// Create users table
-db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT UNIQUE NOT NULL,
-    password_hash TEXT NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    last_login DATETIME
-  )
-`)
+// Create connection pool
+const pool = new Pool({
+  user: process.env.DB_USER || 'postgres',
+  password: process.env.DB_PASSWORD,
+  host: process.env.DB_HOST || 'localhost',
+  port: process.env.DB_PORT || 5432,
+  database: process.env.DB_NAME || 'profilesapp'
+})
 
-// Create initial admin user if it doesn't exist
-// NOTE: In production, create admin user through proper registration or admin panel
-const createUser = db.prepare(`
-  INSERT OR IGNORE INTO users (username, password_hash)
-  VALUES (?, ?)
-`)
+pool.on('error', (err) => {
+  console.error('Unexpected error on idle client', err)
+})
 
-// Only create admin user in development
-if (process.env.NODE_ENV !== 'production') {
-  const adminPassword = bcrypt.hashSync('password123', 12)
-  createUser.run('admin', adminPassword)
-  console.log('Development admin user created')
-} else {
-  console.log('Production mode: No default admin user created')
+// Initialize database tables
+async function initializeDatabase() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        username VARCHAR(255) UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        last_login TIMESTAMP
+      )
+    `)
+    console.log('✅ Database tables initialized')
+
+    // Create initial admin user in development only
+    if (process.env.NODE_ENV !== 'production') {
+      const existingAdmin = await pool.query(
+        'SELECT id FROM users WHERE username = $1',
+        ['admin']
+      )
+      if (existingAdmin.rows.length === 0) {
+        const adminPassword = bcrypt.hashSync('password123', 12)
+        await pool.query(
+          'INSERT INTO users (username, password_hash) VALUES ($1, $2)',
+          ['admin', adminPassword]
+        )
+        console.log('Development admin user created')
+      }
+    } else {
+      console.log('Production mode: No default admin user created')
+    }
+  } catch (error) {
+    console.error('Database initialization error:', error)
+    process.exit(1)
+  }
 }
 
-console.log('Database initialized with admin user')
+// Initialize database on startup
+try {
+  await initializeDatabase()
+} catch (error) {
+  console.error('Failed to initialize database:', error)
+  process.exit(1)
+}
 
-export default db
+export { pool }

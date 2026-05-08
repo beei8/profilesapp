@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: profilesapp-server
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DB_USER
+        value: postgres
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        value: 5432
+      - key: DB_NAME
+        sync: false
+      - key: SETUP_KEY
+        generateValue: true
+    healthCheckPath: /api/protected
+    
+  - type: pserv
+    name: profilesapp-db
+    dbName: profilesapp
+    user: postgres
+    plan: free
