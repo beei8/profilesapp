@@ -22,10 +22,13 @@ services:
         sync: false
       - key: SETUP_KEY
         generateValue: true
-    healthCheckPath: /api/protected
+    healthCheckPath: /health
+    healthCheckInterval: 30
+    autoScalePolicies: []
     
   - type: pserv
     name: profilesapp-db
     dbName: profilesapp
     user: postgres
     plan: free
+    region: oregon

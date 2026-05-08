@@ -72,7 +72,13 @@ app.post('/api/register', async (req, res) => {
     return res.status(400).json({ message: 'Username and password are required' })
   }
 
-  if (username.length < 3await getUserByUsername(username)
+  if (username.length < 3 || password.length < 6) {
+    return res.status(400).json({ message: 'Username must be at least 3 characters and password at least 6 characters' })
+  }
+
+  try {
+    // Check if user already exists
+    const existingUser = await getUserByUsername(username)
     if (existingUser) {
       return res.status(409).json({ message: 'Username already exists' })
     }
@@ -86,13 +92,7 @@ app.post('/api/register', async (req, res) => {
       [username, passwordHash]
     )
 
-    res.status(201).json({ message: 'User registered successfully', userId: result.rows[0].
-
-    // Insert new user
-    const insertUser = db.prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)')
-    const result = insertUser.run(username, passwordHash)
-
-    res.status(201).json({ message: 'User registered successfully', userId: result.lastInsertRowid })
+    res.status(201).json({ message: 'User registered successfully', userId: result.rows[0].id })
   } catch (error) {
     console.error('Registration error:', error)
     res.status(500).json({ message: 'Internal server error' })
@@ -101,7 +101,15 @@ app.post('/api/register', async (req, res) => {
 
 // Setup endpoint for first admin user (only works when no users exist)
 app.post('/api/setup', async (req, res) => {
-  const { username, await pool.query('SELECT COUNT(*) as count FROM users')
+  const { username, password, setupKey } = req.body
+
+  // Check if setup key matches environment variable
+  if (setupKey !== process.env.SETUP_KEY) {
+    return res.status(403).json({ message: 'Invalid setup key' })
+  }
+
+  // Check if any users already exist
+  const userCount = await pool.query('SELECT COUNT(*) as count FROM users')
   if (parseInt(userCount.rows[0].count) > 0) {
     return res.status(403).json({ message: 'Setup already completed' })
   }
@@ -129,15 +137,7 @@ app.post('/api/setup', async (req, res) => {
 
     res.status(201).json({
       message: 'Admin user created successfully',
-      userId: result.rows[0].
-    const insertUser = db.prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)')
-    const result = insertUser.run(username, passwordHash)
-
-    console.log(`🚀 Admin user '${username}' created via setup endpoint`)
-
-    res.status(201).json({
-      message: 'Admin user created successfully',
-      userId: result.lastInsertRowid,
+      userId: result.rows[0].id,
       note: 'Setup endpoint is now disabled'
     })
   } catch (error) {
@@ -146,12 +146,17 @@ app.post('/api/setup', async (req, res) => {
   }
 })
 
+// Login endpoint
 app.post('/api/login', async (req, res) => {
   const { username, password } = req.body
 
   // Basic input validation
   if (!username || !password) {
-    return res.stawait getUserByUsername(username)
+    return res.status(400).json({ message: 'Username and password are required' })
+  }
+
+  try {
+    const user = await getUserByUsername(username)
     if (!user) {
       return res.status(401).json({ message: 'Invalid credentials' })
     }
@@ -162,11 +167,7 @@ app.post('/api/login', async (req, res) => {
     }
 
     // Update last login
-    await updateLastLogis(401).json({ message: 'Invalid credentials' })
-    }
-
-    // Update last login
-    updateLastLogin.run(user.id)
+    await updateLastLogin(user.id)
 
     const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, { expiresIn: '1h' })
     res.json({ token })
@@ -196,13 +197,13 @@ const authenticateToken = (req, res, next) => {
 
 // Protected route example
 app.get('/api/protected', authenticateToken, (req, res) => {
-  res.json({ message: `Hello ${req.user.useasync (req, res) => {
-  try {
-    const user = await getUserByUsername
+  res.json({ message: `Hello ${req.user.username}, this is protected data!` })
+})
+
 // Get user profile
-app.get('/api/profile', authenticateToken, (req, res) => {
+app.get('/api/profile', authenticateToken, async (req, res) => {
   try {
-    const user = getUserByUsername.get(req.user.username)
+    const user = await getUserByUsername(req.user.username)
     if (!user) {
       return res.status(404).json({ message: 'User not found' })
     }

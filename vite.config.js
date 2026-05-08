@@ -7,11 +7,13 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: process.env.NODE_ENV === 'production' 
-          ? 'https://profilesapp-production.up.railway.app' 
-          : 'http://localhost:3001',
+        target: 'http://localhost:3001',
         changeOrigin: true
       }
     }
+  },
+  build: {
+    outDir: 'dist',
+    sourcemap: false
   }
 })
