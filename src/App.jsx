@@ -5,12 +5,16 @@ import Login from './Login'
 import Profile from './Profile'
 
 function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [isLoggedIn, setIsLoggedIn] = useState(null)
 
   useEffect(() => {
     const token = localStorage.getItem('token')
     setIsLoggedIn(!!token)
   }, [])
+
+  if (isLoggedIn === null) {
+    return null
+  }
 
   return (
     <Routes>
