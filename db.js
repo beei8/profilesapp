@@ -6,14 +6,22 @@ dotenv.config()
 
 const { Pool } = pg
 
-// Create connection pool
-const pool = new Pool({
-  user: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD,
-  host: process.env.DB_HOST || 'localhost',
-  port: process.env.DB_PORT || 5432,
-  database: process.env.DB_NAME || 'profilesapp'
-})
+// Create connection pool. If `DATABASE_URL` is provided (e.g. Neon), use it with SSL.
+let pool
+if (process.env.DATABASE_URL) {
+  pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false }
+  })
+} else {
+  pool = new Pool({
+    user: process.env.DB_USER || 'postgres',
+    password: process.env.DB_PASSWORD,
+    host: process.env.DB_HOST || 'localhost',
+    port: process.env.DB_PORT || 5432,
+    database: process.env.DB_NAME || 'profilesapp'
+  })
+}
 
 pool.on('error', (err) => {
   console.error('Unexpected error on idle client', err)
