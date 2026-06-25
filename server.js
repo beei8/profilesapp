@@ -9,6 +9,11 @@ import { pool } from './db.js'
 dotenv.config()
 
 const app = express()
+// Only trust proxy headers in production (e.g., Render/Netlify) so rate-limit
+// can use X-Forwarded-For while keeping development behavior unchanged.
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1)
+}
 // eslint-disable-next-line no-undef
 const PORT = process.env.PORT || 3001
 // eslint-disable-next-line no-undef
